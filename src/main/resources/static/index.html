@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat using WebSocket</title>
+    <script src="sockjs-0.3.4.js"></script>
+    <script src="stomp.js"></script>
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="main.css">
+    
+				
+		
+</head>
+<body>
+<noscript><h2 style="color: #ff0000">Seems your browser doesn't support Javascript! Websocket relies on Javascript being enabled. Please enable
+    Javascript and reload this page!</h2></noscript>
+     
+    <div class="chat">
+		    <div>
+		        <button id="connect" onclick="connect();">Connect</button>
+		        <button id="disconnect" disabled="disabled" onclick="disconnect();">Disconnect</button>
+		    </div>
+			<input type="text" class="chat-name" id="name" placeholder="Enter your name">
+			<div class="chat-messages"></div>
+			<textarea id="message" placeholder="Type your message"></textarea>
+			<div id="cstatus" class="chat-status">Status:<span>Idle</span></div>
+		</div>
+
+<script type="text/javascript">
+    	var messages = document.querySelector('.chat-messages');
+    	//(function(){
+
+				var getNode = function(s){
+					return document.querySelector(s);
+				};
+
+				//get required nodes
+				var textarea = getNode('.chat textarea');
+				var chatName = getNode('.chat-name');	
+					var status = getNode('.chat-status span');
+					
+				var statusDefault = status.textContent;
+				console.log('statusDefault is '+statusDefault);
+
+				var setStatus = function(s){
+					status.textContent = s;
+					//this will bring back the status to defualt status after the send a message or change status
+					//with delay of 3 seconds
+					console.log('function setStatus s is '+s);
+					if(s !== statusDefault){
+						var delay = setTimeout(function(){
+							setStatus(statusDefault);
+							clearInterval(delay);
+						},10000);
+					}
+				};
+				
+				//listen for keydown
+					textarea.addEventListener('keydown',function(event){
+						var self= this,
+						name = chatName.value;
+
+						// console.log(event.which); show which key you press
+						// console.log(event);
+						if(event.which ===13 && event.shiftKey ===false){
+							sendMessage();
+							event.preventDefault();
+						}
+					},false)
+				
+			//	})();
+				
+        var stompClient = null;
+        
+        function setConnected(connected) {
+            document.getElementById('connect').disabled = connected;
+            document.getElementById('disconnect').disabled = !connected;
+              document.querySelector('.chat-status span').textContent ='connected';
+        }
+        
+        function connect() {
+            var socket = new SockJS('/chat');
+            stompClient = Stomp.over(socket);            
+            stompClient.connect({}, function(frame) {
+                setConnected(true);
+                console.log('Connected: ' + frame);
+                stompClient.subscribe('/topic/cignex-main', function(greeting){
+                   showChat(JSON.parse(greeting.body).content);
+                });
+                $.getJSON('/allmessages', function(data) {
+				    $.each(data, function(index, element) {
+				        showChat(element.name +': '+element.message);
+				  });
+				});
+            });
+				
+        }
+        
+        function disconnect() {
+            stompClient.disconnect();
+            setConnected(false);
+             document.querySelector('.chat-status span').textContent ='disconnected';
+            console.log("Disconnected");
+        }
+        
+        function sendMessage() {
+            var name = document.getElementById('name').value;
+            var message = document.getElementById('message').value;
+            stompClient.send("/app/chat", {}, JSON.stringify({ 'name': name ,'message':message}));
+            textarea.value='';
+        }
+        
+        function showGreeting(message) {
+            var response = document.getElementById('response');
+            var p = document.createElement('p');
+            p.style.wordWrap = 'break-word';
+            p.appendChild(document.createTextNode(message));
+            response.appendChild(p);
+        }
+        
+          
+        function showChat(data) {
+           	var message = document.createElement('div');
+			message.setAttribute('class','chat-message');
+			message.textContent = data;
+
+			//Append
+			messages.appendChild(message);
+			insertAfter( messages.lastChild,message)
+        }
+        
+        function insertAfter(referenceNode, newNode) {
+    	referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
+}
+    </script>
+</body>
+</html>
